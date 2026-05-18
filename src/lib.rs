@@ -32,6 +32,7 @@ type Stack = Vec<Closure>;
 
 pub trait Arena {
     fn alloc(&mut self, term: Term) -> usize;
+    fn get(&self, term: usize) -> &Term;
     fn display(&self, term: usize) -> TermDisplay<'_>;
 }
 
@@ -40,8 +41,13 @@ impl Arena for Vec<Term> {
         self.push(term);
         self.len() - 1
     }
-    fn display(&self, term: usize) -> display::TermDisplay<'_> {
-        display::TermDisplay { arena: self, term }
+
+    fn get(&self, term: usize) -> &Term {
+        &self[term]
+    }
+
+    fn display(&self, term: usize) -> TermDisplay<'_> {
+        TermDisplay { term, arena: self }
     }
 }
 
@@ -49,55 +55,42 @@ impl Arena for Vec<Term> {
 pub struct Machine {
     closure: Closure,
     stack: Stack,
-    arena: Vec<Term>,
 }
 
 impl Machine {
-    pub fn new(term: usize, arena: Vec<Term>) -> Self {
-        Machine {
-            closure: Closure {
-                term,
-                env: Vec::new(),
-            },
-            stack: Stack::new(),
-            arena,
-        }
-    }
-
-    pub fn from_clause(closure: Closure, arena: Vec<Term>) -> Self {
+    pub fn new(closure: Closure) -> Self {
         Machine {
             closure,
             stack: Stack::new(),
-            arena,
         }
     }
 
-    pub fn get(&self, term: usize) -> &Term {
-        &self.arena[term]
-    }
-
-    pub fn eval1(&mut self) -> Option<()> {
+    pub fn step(&mut self, arena: &Vec<Term>) -> bool {
         let Closure { term, env } = &mut self.closure;
-        match self.arena[*term] {
+        match *arena.get(*term) {
             Term::Var(k) => {
                 self.closure = env[env.len() - k - 1].clone();
             }
             Term::App(m, n) => {
+                self.stack.push(Closure {
+                    term: n,
+                    env: env.clone(),
+                });
                 *term = m;
-                let env = env.clone();
-                self.stack.push(Closure { term: n, env });
             }
             Term::Abs(m) => {
-                let c = self.stack.pop()?;
+                let Some(c) = self.stack.pop() else {
+                    return false;
+                };
                 *term = m;
                 env.push(c);
             }
         }
-        Some(())
+        true
     }
 
-    pub fn eval(mut self) -> (Closure, Vec<Term>) {
-        while self.eval1().is_some() {}
-        (self.closure, self.arena)
+    pub fn run(mut self, arena: &Vec<Term>) -> Closure {
+        while self.step(arena) {}
+        self.closure
     }
 }

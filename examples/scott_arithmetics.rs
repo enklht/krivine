@@ -1,29 +1,28 @@
 use krivine::*;
 
-pub fn scott_to_int(term: usize, mut arena: Vec<Term>) -> (Option<u32>, Vec<Term>) {
+pub fn scott_to_int(term: usize, arena: &mut Vec<Term>) -> Option<u32> {
     let mut n = 0;
     let mut closure = Closure::new(term);
 
     let zero = term!(arena, (abs (abs 1)));
 
     loop {
-        let machine = Machine::from_clause(closure, arena);
-        (closure, arena) = machine.eval();
+        closure = Machine::new(closure).run(arena);
+        let term = closure.term;
 
-        match arena[closure.term] {
-            Term::Abs(t1) => match arena[t1] {
-                Term::Abs(t2) => match arena[t2] {
-                    Term::Var(1) => return (Some(n), arena),
-                    Term::App(s, _) if matches!(arena[s], Term::Var(0)) => {
+        match arena.get(term) {
+            Term::Abs(t1) => match arena.get(*t1) {
+                Term::Abs(t2) => match arena.get(*t2) {
+                    Term::Var(1) => return Some(n),
+                    Term::App(s, _) if matches!(arena.get(*s), Term::Var(0)) => {
                         n += 1;
-                        let term = closure.term;
                         closure.term = term!(arena, term zero (abs 0));
                     }
-                    _ => return (None, arena),
+                    _ => return None,
                 },
-                _ => return (None, arena),
+                _ => return None,
             },
-            _ => return (None, arena),
+            _ => return None,
         }
     }
 }
@@ -50,10 +49,9 @@ fn main() {
     println!("2 + 2");
 
     let four = term!(arena, (plus two two));
+    println!("{}", arena.display(four));
 
-    let (result, mut arena) = scott_to_int(four, arena);
-
-    match result {
+    match scott_to_int(four, &mut arena) {
         Some(value) => {
             println!("= {}\n", value);
         }
@@ -65,10 +63,9 @@ fn main() {
     println!("2 + ((2 + 2) + 2)");
 
     let eight = term!(arena, (plus two (plus (plus two two) two)));
+    println!("{}", arena.display(eight));
 
-    let (result, _) = scott_to_int(eight, arena);
-
-    match result {
+    match scott_to_int(eight, &mut arena) {
         Some(value) => {
             println!("= {}\n", value);
         }
