@@ -1,14 +1,12 @@
 use krivine::*;
 
-pub fn scott_to_int(term: usize, arena: &mut Vec<Term>) -> Option<u32> {
+pub fn scott_to_int(mut term: usize, arena: &mut Vec<Term>) -> Option<u32> {
     let mut n = 0;
-    let mut closure = Closure::new(term);
 
     let zero = term!(arena, (abs (abs 1)));
 
     loop {
-        closure = Machine::new(closure).run(arena);
-        let term = closure.term;
+        term = Machine::new(term).run(arena);
 
         match arena.get(term) {
             Term::Abs(t1) => match arena.get(*t1) {
@@ -16,7 +14,7 @@ pub fn scott_to_int(term: usize, arena: &mut Vec<Term>) -> Option<u32> {
                     Term::Var(1) => return Some(n),
                     Term::App(s, _) if matches!(arena.get(*s), Term::Var(0)) => {
                         n += 1;
-                        closure.term = term!(arena, term zero (abs 0));
+                        term = term!(arena, term zero (abs 0));
                     }
                     _ => return None,
                 },
@@ -34,6 +32,15 @@ fn main() {
     let succ = term!(arena, (abs (abs (abs 0 2))));
     let one = term!(arena, succ zero);
     let two = term!(arena, succ one);
+
+    match scott_to_int(two, &mut arena) {
+        Some(value) => {
+            println!("= {}\n", value);
+        }
+        None => {
+            println!("not a scott numeral");
+        }
+    }
 
     let y = term!(
         arena,
