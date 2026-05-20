@@ -8,18 +8,18 @@ pub fn scott_to_int(mut term: usize, arena: &mut Vec<Term>) -> Option<u32> {
     loop {
         term = Machine::new(term).run(arena);
 
-        match arena.get(term) {
-            Term::Abs(t1) => match arena.get(*t1) {
-                Term::Abs(t2) => match arena.get(*t2) {
-                    Term::Var(1) => return Some(n),
-                    Term::App(s, _) if matches!(arena.get(*s), Term::Var(0)) => {
-                        n += 1;
-                        term = term!(arena, term zero (abs 0));
-                    }
-                    _ => return None,
-                },
-                _ => return None,
-            },
+        let Term::Abs(t1) = arena.get(term) else {
+            return None;
+        };
+        let Term::Abs(t2) = arena.get(*t1) else {
+            return None;
+        };
+        match arena.get(*t2) {
+            Term::Var(1) => return Some(n),
+            Term::App(s, _) if matches!(arena.get(*s), Term::Var(0)) => {
+                n += 1;
+                term = term!(arena, term zero (abs 0));
+            }
             _ => return None,
         }
     }
@@ -32,6 +32,8 @@ fn main() {
     let succ = term!(arena, (abs (abs (abs 0 2))));
     let one = term!(arena, succ zero);
     let two = term!(arena, succ one);
+
+    println!("2");
 
     match scott_to_int(two, &mut arena) {
         Some(value) => {

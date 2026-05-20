@@ -52,7 +52,7 @@ impl Closure {
 #[derive(Debug)]
 enum StackItem {
     Mark(usize),
-    Arg(Closure),
+    Arg(usize),
 }
 
 type Stack = Vec<StackItem>;
@@ -62,29 +62,39 @@ type Heap = Vec<Closure>;
 pub struct Machine {
     closure: Closure,
     stack: Stack,
-    heap: Heap,
+    closure_heap: Heap,
+    location_heap: Vec<usize>,
 }
 
 fn get_term(
     term: usize,
     env: &Environment,
-    heap: &Heap,
+    closure_heap: &Heap,
+    location_heap: &Vec<usize>,
     arena: &mut Vec<Term>,
     depth: usize,
 ) -> usize {
     match *arena.get(term) {
         Term::Var(x) if x < depth => term,
         Term::Var(x) => {
-            let l = env[env.len() + depth - x - 1];
-            get_term(heap[l].term, &heap[l].env, heap, arena, 0)
+            let r = env[env.len() + depth - x - 1];
+            let l = location_heap[r];
+            get_term(
+                closure_heap[l].term,
+                &closure_heap[l].env,
+                closure_heap,
+                location_heap,
+                arena,
+                0,
+            )
         }
         Term::App(m, n) => {
-            let m = get_term(m, env, heap, arena, depth);
-            let n = get_term(n, env, heap, arena, depth);
+            let m = get_term(m, env, closure_heap, location_heap, arena, depth);
+            let n = get_term(n, env, closure_heap, location_heap, arena, depth);
             arena.alloc(Term::App(m, n))
         }
         Term::Abs(m) => {
-            let m = get_term(m, env, heap, arena, depth + 1);
+            let m = get_term(m, env, closure_heap, location_heap, arena, depth + 1);
             arena.alloc(Term::Abs(m))
         }
     }
@@ -95,7 +105,8 @@ impl Machine {
         Machine {
             closure: Closure::new(term),
             stack: Stack::new(),
-            heap: Heap::new(),
+            closure_heap: Heap::new(),
+            location_heap: Vec::new(),
         }
     }
 
@@ -103,34 +114,49 @@ impl Machine {
         let Closure { term, env } = &mut self.closure;
         match *arena.get(*term) {
             Term::Var(x) => {
-                let l = env[env.len() - x - 1];
-                match arena.get(self.heap[l].term) {
-                    Term::Abs(_) => {
-                        self.closure = self.heap[l].clone();
-                    }
-                    _ => {
-                        self.closure = self.heap[l].clone();
-                        self.stack.push(StackItem::Mark(l));
-                    }
+                let r = env[env.len() - x - 1];
+                let l = self.location_heap[r];
+                let c = self.closure_heap[l].clone();
+
+                if matches!(arena.get(c.term), Term::Abs(_)) {
+                    self.closure = c;
+                    return true;
+                }
+
+                self.closure = c;
+                if let Some(StackItem::Mark(l_prime)) = self.stack.last() {
+                    self.location_heap[r] = *l_prime;
+                } else {
+                    self.stack.push(StackItem::Mark(l));
                 }
             }
             Term::App(m, n) => {
-                self.stack.push(StackItem::Arg(Closure {
-                    term: n,
-                    env: env.clone(),
-                }));
-                *term = m;
+                if let Term::Var(x) = arena.get(n) {
+                    let r = env[env.len() - x - 1];
+
+                    *term = m;
+                    self.stack.push(StackItem::Arg(r));
+                } else {
+                    let l = self.closure_heap.len();
+                    let r = self.location_heap.len();
+
+                    *term = m;
+                    self.stack.push(StackItem::Arg(r));
+                    self.closure_heap.push(Closure {
+                        term: n,
+                        env: env.clone(),
+                    });
+                    self.location_heap.push(l);
+                }
             }
             Term::Abs(m) => match self.stack.pop() {
-                Some(StackItem::Arg(c)) => {
-                    let l = self.heap.len();
+                Some(StackItem::Arg(r)) => {
                     *term = m;
-                    env.push(l);
-                    self.heap.push(c);
+                    env.push(r);
                 }
                 Some(StackItem::Mark(l)) if matches!(arena.get(m), Term::Abs(_)) => {
-                    debug_assert!(l < self.heap.len());
-                    self.heap[l] = self.closure.clone();
+                    debug_assert!(l < self.closure_heap.len());
+                    self.closure_heap[l] = self.closure.clone();
                 }
                 _ => return false,
             },
@@ -140,6 +166,13 @@ impl Machine {
 
     pub fn run(mut self, arena: &mut Vec<Term>) -> usize {
         while self.step(arena) {}
-        get_term(self.closure.term, &self.closure.env, &self.heap, arena, 0)
+        get_term(
+            self.closure.term,
+            &self.closure.env,
+            &self.closure_heap,
+            &self.location_heap,
+            arena,
+            0,
+        )
     }
 }
