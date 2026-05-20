@@ -15,6 +15,7 @@ pub trait Arena {
     fn alloc(&mut self, term: Term) -> usize;
     fn get(&self, term: usize) -> &Term;
     fn display(&self, term: usize) -> TermDisplay<'_>;
+    fn is_val(&self, term: usize) -> bool;
 }
 
 impl Arena for Vec<Term> {
@@ -25,6 +26,10 @@ impl Arena for Vec<Term> {
 
     fn get(&self, term: usize) -> &Term {
         &self[term]
+    }
+
+    fn is_val(&self, term: usize) -> bool {
+        matches!(self[term], Term::Abs(_))
     }
 
     fn display(&self, term: usize) -> TermDisplay<'_> {
@@ -39,18 +44,18 @@ enum Environment {
 }
 
 impl Environment {
-    fn get(&self, mut i: usize, env_arena: &[Environment]) -> usize {
+    fn get(&self, mut x: usize, env_arena: &[Environment]) -> usize {
         let mut current = *self;
         loop {
             let Environment::Cons { parent, value } = current else {
                 panic!("invalid index");
             };
 
-            if i == 0 {
+            if x == 0 {
                 return value;
             }
 
-            i -= 1;
+            x -= 1;
             current = env_arena[parent];
         }
     }
@@ -84,10 +89,10 @@ fn get_term(
     term: usize,
     env: usize,
     machine: &Machine,
-    arena: &mut Vec<Term>,
+    term_arena: &mut Vec<Term>,
     depth: usize,
 ) -> usize {
-    match *arena.get(term) {
+    match *term_arena.get(term) {
         Term::Var(x) if x < depth => term,
         Term::Var(x) => {
             let env = machine.env_arena[env];
@@ -97,18 +102,18 @@ fn get_term(
                 machine.closure_heap[l].term,
                 machine.closure_heap[l].env,
                 machine,
-                arena,
+                term_arena,
                 0,
             )
         }
         Term::App(m, n) => {
-            let m = get_term(m, env, machine, arena, depth);
-            let n = get_term(n, env, machine, arena, depth);
-            arena.alloc(Term::App(m, n))
+            let m = get_term(m, env, machine, term_arena, depth);
+            let n = get_term(n, env, machine, term_arena, depth);
+            term_arena.alloc(Term::App(m, n))
         }
         Term::Abs(m) => {
-            let m = get_term(m, env, machine, arena, depth + 1);
-            arena.alloc(Term::Abs(m))
+            let m = get_term(m, env, machine, term_arena, depth + 1);
+            term_arena.alloc(Term::Abs(m))
         }
     }
 }
@@ -129,16 +134,16 @@ impl Machine {
         }
     }
 
-    pub fn step(&mut self, arena: &Vec<Term>) -> bool {
+    pub fn step(&mut self, term_arena: &Vec<Term>) -> bool {
         let Closure { term, env } = &mut self.closure;
-        match *arena.get(*term) {
+        match *term_arena.get(*term) {
             Term::Var(x) => {
                 let env = self.env_arena[*env];
                 let r = env.get(x, &self.env_arena);
                 let l = self.location_heap[r];
                 let c = self.closure_heap[l];
 
-                if matches!(arena.get(c.term), Term::Abs(_)) {
+                if term_arena.is_val(c.term) {
                     self.closure = c;
                     return true;
                 }
@@ -151,7 +156,7 @@ impl Machine {
                 }
             }
             Term::App(m, n) => {
-                if let &Term::Var(x) = arena.get(n) {
+                if let &Term::Var(x) = term_arena.get(n) {
                     let env = self.env_arena[*env];
                     let r = env.get(x, &self.env_arena);
 
@@ -179,7 +184,7 @@ impl Machine {
                     );
                     *env = new_env;
                 }
-                Some(StackItem::Mark(l)) if matches!(arena.get(m), Term::Abs(_)) => {
+                Some(StackItem::Mark(l)) if term_arena.is_val(m) => {
                     debug_assert!(l < self.closure_heap.len());
                     self.closure_heap[l] = self.closure;
                 }
@@ -189,8 +194,8 @@ impl Machine {
         true
     }
 
-    pub fn run(&mut self, arena: &mut Vec<Term>) -> usize {
-        while self.step(arena) {}
-        get_term(self.closure.term, self.closure.env, self, arena, 0)
+    pub fn run(&mut self, term_arena: &mut Vec<Term>) -> usize {
+        while self.step(term_arena) {}
+        get_term(self.closure.term, self.closure.env, self, term_arena, 0)
     }
 }

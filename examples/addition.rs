@@ -1,6 +1,6 @@
 use krivine::*;
 
-pub fn scott_to_int(mut term: usize, arena: &mut Vec<Term>) -> Option<u32> {
+fn scott_to_int(mut term: usize, arena: &mut Vec<Term>) -> Option<u32> {
     let mut n = 0;
 
     let zero = term!(arena, (abs (abs 1)));
@@ -33,17 +33,6 @@ fn main() {
     let one = term!(arena, succ zero);
     let two = term!(arena, succ one);
 
-    println!("2");
-
-    match scott_to_int(two, &mut arena) {
-        Some(value) => {
-            println!("= {}\n", value);
-        }
-        None => {
-            println!("not a scott numeral");
-        }
-    }
-
     let y = term!(
         arena,
         (abs (abs 1 (0 0))
@@ -55,31 +44,19 @@ fn main() {
         y (abs (abs (abs 1 0 (abs succ (3 0 1)))))
     );
 
-    println!("2 + 2");
-
     let four = term!(arena, (plus two two));
-    println!("{}", arena.display(four));
+    let four_value = scott_to_int(four, &mut arena).expect("not a scott numeral");
 
-    match scott_to_int(four, &mut arena) {
-        Some(value) => {
-            println!("= {}\n", value);
-        }
-        None => {
-            println!("not a scott numeral");
-        }
-    }
+    println!("2 + 2");
+    println!("> {}", four_value);
+    assert_eq!(four_value, 4);
 
-    println!("2 + ((2 + 2) + 2)");
+    println!();
 
     let eight = term!(arena, (plus two (plus (plus two two) two)));
-    println!("{}", arena.display(eight));
+    let eight_value = scott_to_int(eight, &mut arena).expect("not a scott numeral");
 
-    match scott_to_int(eight, &mut arena) {
-        Some(value) => {
-            println!("= {}\n", value);
-        }
-        None => {
-            println!("not a scott numeral");
-        }
-    }
+    println!("2 + ((2 + 2) + 2)");
+    println!("> {}", eight_value);
+    assert_eq!(eight_value, 8);
 }

@@ -4,7 +4,7 @@ A small Rust implementation of the call-by-need Krivine machine (CS variant), fo
 
 ## Examples
 
-- `cargo run --example scott_arithmetics`
+- `cargo run --example addition`
 - `cargo run --example factorial`
 - `cargo run --example takeuchi`
 

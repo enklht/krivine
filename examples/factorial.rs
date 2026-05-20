@@ -1,31 +1,6 @@
 use krivine::*;
 
-pub fn scott_to_int(mut term: usize, arena: &mut Vec<Term>) -> Option<u32> {
-    let mut n = 0;
-
-    let zero = term!(arena, (abs (abs 1)));
-
-    loop {
-        term = Machine::new(term).run(arena);
-
-        let Term::Abs(t1) = arena.get(term) else {
-            return None;
-        };
-        let Term::Abs(t2) = arena.get(*t1) else {
-            return None;
-        };
-        match arena.get(*t2) {
-            Term::Var(1) => return Some(n),
-            Term::App(s, _) if matches!(arena.get(*s), Term::Var(0)) => {
-                n += 1;
-                term = term!(arena, term zero (abs 0));
-            }
-            _ => return None,
-        }
-    }
-}
-
-pub fn bool_to_rust(term: usize, arena: &mut Vec<Term>) -> Option<bool> {
+fn scott_to_bool(term: usize, arena: &mut Vec<Term>) -> Option<bool> {
     let term = Machine::new(term).run(arena);
 
     let Term::Abs(t1) = arena.get(term) else {
@@ -93,7 +68,7 @@ fn main() {
 
     let test = term!(arena, iszero (sub factorial_five one_twenty));
     println!("(=0 (- (factorial 5) 120))");
-    let test_value = bool_to_rust(test, &mut arena).expect("not a boolean");
-    println!("= {}", test_value);
+    let test_value = scott_to_bool(test, &mut arena).expect("not a boolean");
+    println!("> {}", test_value);
     assert!(test_value);
 }
