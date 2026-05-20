@@ -1,6 +1,6 @@
 # krivine
 
-A small Rust implementation of the call-by-need Krivine machine (CS variant), following the optimization from Friedman et al. (2007) that avoids redundant update-marker sequences and yields a more space and efficient variant of Krivine’s original K machine.
+A small Rust implementation of the call-by-need Krivine machine (CS variant), following the optimization from Friedman et al. (2007) that avoids redundant update-marker sequences and yields a more space efficient variant of Krivine’s original K machine.
 
 ## Examples
 
