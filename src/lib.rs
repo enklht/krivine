@@ -13,7 +13,6 @@ pub enum Term {
 
 pub trait Arena {
     fn alloc(&mut self, term: Term) -> usize;
-    fn get(&self, term: usize) -> &Term;
     fn display(&self, term: usize) -> TermDisplay<'_>;
     fn is_val(&self, term: usize) -> bool;
 }
@@ -22,10 +21,6 @@ impl Arena for Vec<Term> {
     fn alloc(&mut self, term: Term) -> usize {
         self.push(term);
         self.len() - 1
-    }
-
-    fn get(&self, term: usize) -> &Term {
-        &self[term]
     }
 
     fn is_val(&self, term: usize) -> bool {
@@ -44,7 +39,7 @@ enum Environment {
 }
 
 impl Environment {
-    fn get(&self, mut x: usize, env_arena: &[Environment]) -> usize {
+    fn lookup(&self, mut x: usize, env_arena: &[Environment]) -> usize {
         let mut current = *self;
         loop {
             let Environment::Cons { parent, value } = current else {
@@ -92,11 +87,11 @@ fn get_term(
     term_arena: &mut Vec<Term>,
     depth: usize,
 ) -> usize {
-    match *term_arena.get(term) {
+    match term_arena[term] {
         Term::Var(x) if x < depth => term,
         Term::Var(x) => {
             let env = machine.env_arena[env];
-            let r = env.get(x - depth, &machine.env_arena);
+            let r = env.lookup(x - depth, &machine.env_arena);
             let l = machine.location_heap[r];
             get_term(
                 machine.closure_heap[l].term,
@@ -136,10 +131,10 @@ impl Machine {
 
     pub fn step(&mut self, term_arena: &Vec<Term>) -> bool {
         let Closure { term, env } = &mut self.closure;
-        match *term_arena.get(*term) {
+        match term_arena[*term] {
             Term::Var(x) => {
                 let env = self.env_arena[*env];
-                let r = env.get(x, &self.env_arena);
+                let r = env.lookup(x, &self.env_arena);
                 let l = self.location_heap[r];
                 let c = self.closure_heap[l];
 
@@ -156,9 +151,9 @@ impl Machine {
                 }
             }
             Term::App(m, n) => {
-                if let &Term::Var(x) = term_arena.get(n) {
+                if let Term::Var(x) = term_arena[n] {
                     let env = self.env_arena[*env];
-                    let r = env.get(x, &self.env_arena);
+                    let r = env.lookup(x, &self.env_arena);
 
                     *term = m;
                     self.stack.push(StackItem::Arg(r));
@@ -175,14 +170,13 @@ impl Machine {
             Term::Abs(m) => match self.stack.pop() {
                 Some(StackItem::Arg(r)) => {
                     *term = m;
-                    let new_env = alloc_env(
+                    *env = alloc_env(
                         Environment::Cons {
                             parent: *env,
                             value: r,
                         },
                         &mut self.env_arena,
                     );
-                    *env = new_env;
                 }
                 Some(StackItem::Mark(l)) if term_arena.is_val(m) => {
                     debug_assert!(l < self.closure_heap.len());

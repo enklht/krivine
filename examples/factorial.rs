@@ -3,14 +3,14 @@ use krivine::*;
 fn scott_to_bool(term: usize, arena: &mut Vec<Term>) -> Option<bool> {
     let term = Machine::new(term).run(arena);
 
-    let Term::Abs(t1) = arena.get(term) else {
+    let Term::Abs(t1) = arena[term] else {
         return None;
     };
-    let Term::Abs(t2) = arena.get(*t1) else {
+    let Term::Abs(t2) = arena[t1] else {
         return None;
     };
 
-    match arena.get(*t2) {
+    match arena[t2] {
         Term::Var(1) => Some(true),
         Term::Var(0) => Some(false),
         _ => None,

@@ -8,15 +8,15 @@ fn scott_to_int(mut term: usize, arena: &mut Vec<Term>) -> Option<u32> {
     loop {
         term = Machine::new(term).run(arena);
 
-        let Term::Abs(t1) = arena.get(term) else {
+        let Term::Abs(t1) = arena[term] else {
             return None;
         };
-        let Term::Abs(t2) = arena.get(*t1) else {
+        let Term::Abs(t2) = arena[t1] else {
             return None;
         };
-        match arena.get(*t2) {
+        match arena[t2] {
             Term::Var(1) => return Some(n),
-            Term::App(s, _) if matches!(arena.get(*s), Term::Var(0)) => {
+            Term::App(s, _) if matches!(arena[s], Term::Var(0)) => {
                 n += 1;
                 term = term!(arena, term zero (abs 0));
             }
